@@ -90,3 +90,12 @@ class GatheringEnv(gym.Env):
             fill_cell(x, y, self.agent_colors[i])
 
         self.root.update()
+
+    def close(self):
+        if self.root:
+            self.root.destroy()
+            self.root = None
+            self.canvas = None
+
+    def __del__(self):
+        self.close()
