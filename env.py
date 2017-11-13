@@ -9,7 +9,7 @@ import numpy as np
 class GatheringEnv(gym.Env):
     metadata = {'render.modes': ['human']}
     scale = 10
-    width = 51
+    width = 31
     height = 11
     agent_colors = ['red', 'blue']
 
