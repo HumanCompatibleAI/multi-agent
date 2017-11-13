@@ -9,8 +9,8 @@ import numpy as np
 class GatheringEnv(gym.Env):
     metadata = {'render.modes': ['human']}
     scale = 10
-    width = 50
-    height = 10
+    width = 51
+    height = 11
     agent_colors = ['red', 'blue']
 
     def __init__(self, n_agents=1):
@@ -37,7 +37,16 @@ class GatheringEnv(gym.Env):
 
     def _reset(self):
         self.food = np.zeros((self.width, self.height), dtype=np.bool)
-        self.food[3, 4] = True
+        mid_x = self.width // 2
+        mid_y = self.height // 2
+        self.food[mid_x - 2:mid_x + 3, mid_y - 2: mid_y + 3] = np.array([
+            [0, 0, 1, 0, 0],
+            [0, 1, 1, 1, 0],
+            [1, 1, 1, 1, 1],
+            [0, 1, 1, 1, 0],
+            [0, 0, 1, 0, 0],
+        ]).T
+
         self.agents = [(i, 0) for i in range(self.n_agents)]
 
     def _render(self, mode='human', close=False):
