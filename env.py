@@ -48,6 +48,11 @@ class GatheringEnv(gym.Env):
         done_n = [self.done] * self.n_agents
         info_n = [None] * self.n_agents
 
+        for i, a in enumerate(self.agents):
+            if self.food[a]:
+                self.food[a] = False
+            reward_n[i] = 1
+
         return obs_n, reward_n, done_n, info_n
 
     def _reset(self):
