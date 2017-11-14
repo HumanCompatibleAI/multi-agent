@@ -50,13 +50,15 @@ class GatheringEnv(gym.Env):
 
         for i, a in enumerate(self.agents):
             if self.food[a]:
-                self.food[a] = False
-            reward_n[i] = 1
+                self.food[a] = -15
+                reward_n[i] = 1
+
+        self.food = (self.food + self.initial_food).clip(max=1)
 
         return obs_n, reward_n, done_n, info_n
 
     def _reset(self):
-        self.food = np.zeros((self.width, self.height), dtype=np.bool)
+        self.food = np.zeros((self.width, self.height), dtype=np.int)
         mid_x = self.width // 2
         mid_y = self.height // 2
         self.food[mid_x - 2:mid_x + 3, mid_y - 2: mid_y + 3] = np.array([
@@ -66,6 +68,7 @@ class GatheringEnv(gym.Env):
             [0, 1, 1, 1, 0],
             [0, 0, 1, 0, 0],
         ]).T
+        self.initial_food = self.food.copy()
 
         self.agents = [(i, 0) for i in range(self.n_agents)]
 
@@ -103,7 +106,7 @@ class GatheringEnv(gym.Env):
 
         for x in range(self.width):
             for y in range(self.height):
-                if self.food[x, y]:
+                if self.food[x, y] == 1:
                     fill_cell(x, y, 'green')
 
         for i, (x, y) in enumerate(self.agents):
