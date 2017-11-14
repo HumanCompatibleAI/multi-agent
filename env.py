@@ -1,3 +1,4 @@
+import collections
 import tkinter as tk
 
 import gym
@@ -21,19 +22,33 @@ class GatheringEnv(gym.Env):
         self.reset()
         self.done = False
 
-    def _step(self, actions):
-        assert len(actions) == self.n_agents
+    def _step(self, action_n):
+        assert len(action_n) == self.n_agents
         directions = [
             (0, -1),  # up
             (1, 0),   # right
             (0, 1),   # down
             (-1, 0),  # left
         ]
-        actions = [directions[a] for a in actions]
-        for i, ((dx, dy), (x, y)) in enumerate(zip(actions, self.agents)):
-            self.agents[i] = ((x + dx) % self.width, (y + dy) % self.height)
+        action_n = [directions[a] for a in action_n]
+        next_locations = [a for a in self.agents]
+        next_locations_map = collections.defaultdict(list)
+        for i, ((dx, dy), (x, y)) in enumerate(zip(action_n, self.agents)):
+            next_ = ((x + dx) % self.width, (y + dy) % self.height)
+            next_locations[i] = next_
+            next_locations_map[next_].append(i)
+        for overlappers in next_locations_map.values():
+            if len(overlappers) > 1:
+                for i in overlappers:
+                    next_locations[i] = self.agents[i]
+        self.agents = next_locations
 
-        return [], 0, self.done, None
+        obs_n = [None] * self.n_agents
+        reward_n = [0 for _ in range(self.n_agents)]
+        done_n = [self.done] * self.n_agents
+        info_n = [None] * self.n_agents
+
+        return obs_n, reward_n, done_n, info_n
 
     def _reset(self):
         self.food = np.zeros((self.width, self.height), dtype=np.bool)

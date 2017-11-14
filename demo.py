@@ -7,8 +7,8 @@ env.reset()
 env.render()
 
 for _ in range(1000):
-    observation, reward, done, info = env.step(env.action_space.sample())
-    if done:
+    observation_n, reward_n, done_n, info_n = env.step(env.action_space.sample())
+    if any(done_n):
         break
     env.render()
     time.sleep(1 / 30)
