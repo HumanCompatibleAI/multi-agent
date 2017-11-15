@@ -16,7 +16,6 @@ class GatheringEnv(gym.Env):
     agent_colors = ['red', 'blue']
 
     def __init__(self, n_agents=1):
-        super().__init__()
         self.n_agents = n_agents
         self.root = None
         self.state_size = self.width * self.height * 3
