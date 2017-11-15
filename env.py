@@ -101,6 +101,10 @@ class GatheringEnv(gym.Env):
         self.done = True
 
     def _render(self, mode='human', close=False):
+        if close:
+            self._close_view()
+            return
+
         canvas_width = self.width * self.scale
         canvas_height = self.height * self.scale
 
@@ -110,10 +114,6 @@ class GatheringEnv(gym.Env):
             self.root.protocol('WM_DELETE_WINDOW', self._close_view)
             self.canvas = tk.Canvas(self.root, width=canvas_width, height=canvas_height)
             self.canvas.pack()
-
-        if close:
-            self._close_view()
-            return
 
         self.canvas.delete(tk.ALL)
         self.canvas.create_rectangle(0, 0, canvas_width, canvas_height, fill='black')
