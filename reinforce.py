@@ -82,6 +82,7 @@ def finish_episode():
 running_reward = 10
 for i_episode in count(1):
     state = env.reset()[0]
+    episode_reward = 0
     for t in range(1000):  # Don't infinite loop while learning
         action = select_action(state)
         state_n, reward_n, done_n, _ = env.step([action[0, 0], random.randrange(0, 4)])
@@ -91,15 +92,16 @@ for i_episode in count(1):
         if args.render:
             env.render()
         policy.rewards.append(reward)
+        episode_reward += reward
         if done:
             break
 
-    running_reward = running_reward * 0.99 + t * 0.01
+    running_reward = running_reward * 0.99 + episode_reward * 0.01
     finish_episode()
     if i_episode % args.log_interval == 0:
-        print('Episode {}\tLast length: {:5d}\tAverage length: {:.2f}'.format(
-            i_episode, t, running_reward))
+        print('Episode {}\tLast reward: {:5d}\tAverage reward: {:.2f}'.format(
+            i_episode, episode_reward, running_reward))
     if running_reward > env.spec.reward_threshold:
         print("Solved! Running reward is now {} and "
-              "the last episode runs to {} time steps!".format(running_reward, t))
+              "the last episode received {} reward!".format(running_reward, episode_reward))
         break
