@@ -13,7 +13,7 @@ class GatheringEnv(gym.Env):
     scale = 10
     width = 31
     height = 11
-    agent_colors = ['red', 'blue']
+    agent_colors = ['red', 'yellow']
 
     def __init__(self, n_agents=1):
         self.n_agents = n_agents
