@@ -2,6 +2,7 @@ import collections
 import tkinter as tk
 
 import gym
+import gym.envs.registration
 import gym.spaces
 
 import numpy as np
@@ -18,7 +19,10 @@ class GatheringEnv(gym.Env):
         super().__init__()
         self.n_agents = n_agents
         self.root = None
+        self.state_size = self.width * self.height * 3
         self.action_space = gym.spaces.MultiDiscrete([[0, 3]] * n_agents)
+        self.observation_space = gym.spaces.MultiDiscrete([[[0, 1]] * self.state_size] * n_agents)
+        self._spec = gym.envs.registration.EnvSpec(**_spec)
         self.reset()
         self.done = False
 
@@ -43,10 +47,10 @@ class GatheringEnv(gym.Env):
                     next_locations[i] = self.agents[i]
         self.agents = next_locations
 
-        obs_n = [None] * self.n_agents
+        obs_n = self.state_n
         reward_n = [0 for _ in range(self.n_agents)]
         done_n = [self.done] * self.n_agents
-        info_n = [None] * self.n_agents
+        info_n = [{}] * self.n_agents
 
         for i, a in enumerate(self.agents):
             if self.food[a]:
@@ -56,6 +60,21 @@ class GatheringEnv(gym.Env):
         self.food = (self.food + self.initial_food).clip(max=1)
 
         return obs_n, reward_n, done_n, info_n
+
+    @property
+    def state_n(self):
+        agents = np.zeros_like(self.food)
+        for a in self.agents:
+            agents[a] = 1
+        s = np.array([[
+            self.food.clip(min=0),
+            np.zeros_like(self.food),
+            agents,
+        ]]).repeat(self.n_agents, axis=0)
+        for i, (x, y) in enumerate(self.agents):
+            s[i, 1, x, y] = 1
+            s[i, 2, x, y] = 0
+        return s.reshape((self.n_agents, self.state_size))
 
     def _reset(self):
         self.food = np.zeros((self.width, self.height), dtype=np.int)
@@ -72,24 +91,28 @@ class GatheringEnv(gym.Env):
 
         self.agents = [(i, 0) for i in range(self.n_agents)]
 
+        return self.state_n
+
+    def _close_view(self):
+        if self.root:
+            self.root.destroy()
+            self.root = None
+            self.canvas = None
+        self.done = True
+
     def _render(self, mode='human', close=False):
         canvas_width = self.width * self.scale
         canvas_height = self.height * self.scale
 
         if self.root is None:
-            def on_close():
-                self.done = True
-                self.root.destroy()
-                self.root = None
-                self.canavs = None
             self.root = tk.Tk()
             self.root.title('Gathering')
-            self.root.protocol('WM_DELETE_WINDOW', on_close)
+            self.root.protocol('WM_DELETE_WINDOW', self._close_view)
             self.canvas = tk.Canvas(self.root, width=canvas_width, height=canvas_height)
             self.canvas.pack()
 
         if close:
-            self.root.destroy()
+            self._close_view()
             return
 
         self.canvas.delete(tk.ALL)
@@ -114,11 +137,18 @@ class GatheringEnv(gym.Env):
 
         self.root.update()
 
-    def close(self):
-        if self.root:
-            self.root.destroy()
-            self.root = None
-            self.canvas = None
+    def _close(self):
+        self._close_view()
 
     def __del__(self):
         self.close()
+
+
+_spec = {
+    'id': 'Gathering-v0',
+    'entry_point': GatheringEnv,
+    'reward_threshold': 100,
+}
+
+
+gym.envs.registration.register(**_spec)
