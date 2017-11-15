@@ -1,1 +1,4 @@
 __pycache__/
+
+# local tests jeremy is running
+Dockerfile.py*
