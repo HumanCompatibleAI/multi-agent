@@ -8,14 +8,13 @@ from itertools import count
 
 from env import GatheringEnv
 
+from model import Policy
+
 import numpy as np
 
 import torch
 import torch.autograd as autograd
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
-from torch.autograd import Variable
 
 
 parser = argparse.ArgumentParser(description='PyTorch REINFORCE example')
@@ -35,31 +34,9 @@ env.seed(args.seed)
 torch.manual_seed(args.seed)
 
 
-class Policy(nn.Module):
-    def __init__(self):
-        super(Policy, self).__init__()
-        self.affine1 = nn.Linear(env.state_size, 128)
-        self.affine2 = nn.Linear(128, 4)
-
-        self.saved_actions = []
-        self.rewards = []
-
-    def forward(self, x):
-        x = F.relu(self.affine1(x))
-        action_scores = self.affine2(x)
-        return F.softmax(action_scores)
-
-
-policy = Policy()
+policy = Policy(env.state_size)
+policy.load_weights()
 optimizer = optim.Adam(policy.parameters(), lr=1e-2)
-
-
-def select_action(state):
-    state = torch.from_numpy(state).float().unsqueeze(0)
-    probs = policy(Variable(state))
-    action = probs.multinomial()
-    policy.saved_actions.append(action)
-    return action.data
 
 
 def finish_episode():
@@ -84,8 +61,8 @@ for i_episode in count(1):
     state = env.reset()[0]
     episode_reward = 0
     for t in range(1000):  # Don't infinite loop while learning
-        action = select_action(state)
-        state_n, reward_n, done_n, _ = env.step([action[0, 0], random.randrange(0, 4)])
+        action = policy.select_action(state)
+        state_n, reward_n, done_n, _ = env.step([action, random.randrange(0, 4)])
         state = state_n[0]
         reward = reward_n[0]
         done = done_n[0]
@@ -101,7 +78,9 @@ for i_episode in count(1):
     if i_episode % args.log_interval == 0:
         print('Episode {}\tLast reward: {:5d}\tAverage reward: {:.2f}'.format(
             i_episode, episode_reward, running_reward))
+        policy.save_weights()
     if running_reward > env.spec.reward_threshold:
         print("Solved! Running reward is now {} and "
               "the last episode received {} reward!".format(running_reward, episode_reward))
+        policy.save_weights()
         break
