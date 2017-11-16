@@ -8,7 +8,7 @@ class Policy(nn.Module):
     def __init__(self, observation_size):
         super(Policy, self).__init__()
         self.affine1 = nn.Linear(observation_size, 128)
-        self.affine2 = nn.Linear(128, 7)
+        self.affine2 = nn.Linear(128, 8)
 
         self.saved_actions = []
         self.rewards = []

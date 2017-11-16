@@ -28,7 +28,7 @@ class GatheringEnv(gym.Env):
         self.n_agents = n_agents
         self.root = None
         self.state_size = self.viewbox_width * self.viewbox_depth * 4
-        self.action_space = gym.spaces.MultiDiscrete([[0, 6]] * n_agents)
+        self.action_space = gym.spaces.MultiDiscrete([[0, 7]] * n_agents)
         self.observation_space = gym.spaces.MultiDiscrete([[[0, 1]] * self.state_size] * n_agents)
         self._spec = gym.envs.registration.EnvSpec(**_spec)
         self.reset()
@@ -36,12 +36,13 @@ class GatheringEnv(gym.Env):
 
     def _step(self, action_n):
         assert len(action_n) == self.n_agents
+        self.beams[:] = 0
         directions = [
             (0, -1),  # up
             (1, 0),   # right
             (0, 1),   # down
             (-1, 0),  # left
-        ] + [(0, 0)] * 3  # other, non-movement actions
+        ] + [(0, 0)] * 4  # other, non-movement actions
         movement_n = [directions[a] for a in action_n]
         next_locations = [a for a in self.agents]
         next_locations_map = collections.defaultdict(list)
@@ -62,6 +63,8 @@ class GatheringEnv(gym.Env):
                 self.orientations[i] = (self.orientations[i] + 1) % 4
             elif act == 5:  # left
                 self.orientations[i] = (self.orientations[i] - 1) % 4
+            elif act == 6:  # tag
+                self.beams[self._viewbox_slice(i, 5, 20)] = 1
 
         obs_n = self.state_n
         reward_n = [0 for _ in range(self.n_agents)]
@@ -81,12 +84,12 @@ class GatheringEnv(gym.Env):
         left = width // 2
         right = left if width % 2 == 0 else left + 1
         x, y = self.agents[agent_index]
-        return itertools.starmap(slice, (
+        return tuple(itertools.starmap(slice, (
             ((x - left, x + right), (y, y - depth, -1)),      # up
             ((x, x + depth), (y - left, y + right)),          # right
             ((x + left, x - right, -1), (y, y + depth)),      # down
             ((x, x - depth, -1), (y + left, y - right, -1)),  # left
-        )[self.orientations[agent_index]])
+        )[self.orientations[agent_index]]))
 
     @property
     def state_n(self):
@@ -127,6 +130,8 @@ class GatheringEnv(gym.Env):
         self.walls[p:-p, -p - 1] = 1
         self.walls[p, p:-p] = 1
         self.walls[-p - 1, p:-p] = 1
+
+        self.beams = np.zeros_like(self.food)
 
         self.agents = [(i + self.padding + 1, self.padding + 1) for i in range(self.n_agents)]
         self.orientations = [UP for _ in range(self.n_agents)]
@@ -169,6 +174,8 @@ class GatheringEnv(gym.Env):
 
         for x in range(self.width):
             for y in range(self.height):
+                if self.beams[x, y] == 1:
+                    fill_cell(x, y, 'yellow')
                 if self.food[x, y] == 1:
                     fill_cell(x, y, 'green')
                 if self.walls[x, y] == 1:
