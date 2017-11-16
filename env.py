@@ -85,9 +85,19 @@ class GatheringEnv(gym.Env):
                 self.food[a] = -15
                 reward_n[i] = 1
             if self.beams[a]:
-                self.tagged[i] = True
+                self.tagged[i] = 25
 
         self.food = (self.food + self.initial_food).clip(max=1)
+
+        for i, tag in enumerate(self.tagged):
+            if tag == 1:
+                # Relocate to a respawn point.
+                for spawn_point in self.spawn_points:
+                    if spawn_point not in self.agents:
+                        self.agents[i] = spawn_point
+                        break
+
+        self.tagged = [max(i - 1, 0) for i in self.tagged]
 
         return obs_n, reward_n, done_n, info_n
 
@@ -147,8 +157,9 @@ class GatheringEnv(gym.Env):
         self.beams = np.zeros_like(self.food)
 
         self.agents = [(i + self.padding + 1, self.padding + 1) for i in range(self.n_agents)]
+        self.spawn_points = self.agents.copy()
         self.orientations = [UP for _ in self.agents]
-        self.tagged = [False for _ in self.agents]
+        self.tagged = [0 for _ in self.agents]
 
         return self.state_n
 
