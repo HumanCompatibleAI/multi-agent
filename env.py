@@ -176,7 +176,7 @@ class GatheringEnv(gym.Env):
         self.beams = np.zeros_like(self.food)
 
         self.agents = [(i + self.padding + 1, self.padding + 1) for i in range(self.n_agents)]
-        self.spawn_points = self.agents.copy()
+        self.spawn_points = list(self.agents)
         self.orientations = [UP for _ in self.agents]
         self.tagged = [0 for _ in self.agents]
 
