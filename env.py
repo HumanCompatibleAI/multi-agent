@@ -33,7 +33,12 @@ class GatheringEnv(gym.Env):
         for row in m:
             if len(row) != l:
                 raise ValueError('the rows in the map are not all the same length')
-        return np.pad(np.array(m) == 'O', self.padding + 1, 'constant').T
+
+        def pad(a):
+            return np.pad(a, self.padding + 1, 'constant')
+        a = np.array(m).T
+        self.initial_food = pad(a == 'O').astype(np.int)
+        self.walls = pad(a == '#').astype(np.int)
 
     def __init__(self, n_agents=1, map_name='default'):
         self.n_agents = n_agents
@@ -44,10 +49,9 @@ class GatheringEnv(gym.Env):
                 raise ValueError('map not found: ' + map_name)
             map_name = expanded
         with open(map_name) as f:
-            s = f.read().strip()
-        self.map = self._text_to_map(s)
-        self.width = self.map.shape[0]
-        self.height = self.map.shape[1]
+            self._text_to_map(f.read().strip())
+        self.width = self.initial_food.shape[0]
+        self.height = self.initial_food.shape[1]
         self.state_size = self.viewbox_width * self.viewbox_depth * 4
         self.action_space = gym.spaces.MultiDiscrete([[0, 7]] * n_agents)
         self.observation_space = gym.spaces.MultiDiscrete([[[0, 1]] * self.state_size] * n_agents)
@@ -161,10 +165,8 @@ class GatheringEnv(gym.Env):
         return s.reshape((self.n_agents, self.state_size))
 
     def _reset(self):
-        self.food = self.map.astype(np.int)
-        self.initial_food = self.food.copy()
+        self.food = self.initial_food.copy()
 
-        self.walls = np.zeros_like(self.food)
         p = self.padding
         self.walls[p:-p, p] = 1
         self.walls[p:-p, -p - 1] = 1
