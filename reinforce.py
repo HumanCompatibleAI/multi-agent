@@ -56,13 +56,13 @@ def finish_episode():
     del policy.saved_actions[:]
 
 
-running_reward = 10
+running_reward = None
 for i_episode in count(1):
     state = env.reset()[0]
     episode_reward = 0
     for t in range(1000):  # Don't infinite loop while learning
         action = policy.select_action(state)
-        state_n, reward_n, done_n, _ = env.step([action, random.randrange(0, 4)])
+        state_n, reward_n, done_n, _ = env.step([action, random.randrange(0, 8)])
         state = state_n[0]
         reward = reward_n[0]
         done = done_n[0]
@@ -73,6 +73,8 @@ for i_episode in count(1):
         if done:
             break
 
+    if running_reward is None:
+        running_reward = episode_reward
     running_reward = running_reward * 0.99 + episode_reward * 0.01
     finish_episode()
     if i_episode % args.log_interval == 0:
