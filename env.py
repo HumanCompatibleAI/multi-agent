@@ -12,6 +12,10 @@ UP = 0
 RIGHT = 1
 DOWN = 2
 LEFT = 3
+ROTATE_RIGHT = 4
+ROTATE_LEFT = 5
+LASER = 6
+NOOP = 7
 
 
 class GatheringEnv(gym.Env):
@@ -36,6 +40,7 @@ class GatheringEnv(gym.Env):
 
     def _step(self, action_n):
         assert len(action_n) == self.n_agents
+        action_n = [NOOP if self.tagged[i] else a for i, a in enumerate(action_n)]
         self.beams[:] = 0
         directions = [
             (0, -1),  # up
@@ -47,6 +52,8 @@ class GatheringEnv(gym.Env):
         next_locations = [a for a in self.agents]
         next_locations_map = collections.defaultdict(list)
         for i, ((dx, dy), (x, y)) in enumerate(zip(movement_n, self.agents)):
+            if self.tagged[i]:
+                continue
             next_ = ((x + dx), (y + dy))
             if self.walls[next_]:
                 next_ = (x, y)
@@ -59,12 +66,12 @@ class GatheringEnv(gym.Env):
         self.agents = next_locations
 
         for i, act in enumerate(action_n):
-            if act == 4:  # right
+            if act == ROTATE_RIGHT:
                 self.orientations[i] = (self.orientations[i] + 1) % 4
-            elif act == 5:  # left
+            elif act == ROTATE_LEFT:
                 self.orientations[i] = (self.orientations[i] - 1) % 4
-            elif act == 6:  # tag
-                self.beams[self._viewbox_slice(i, 5, 20)] = 1
+            elif act == LASER:
+                self.beams[self._viewbox_slice(i, 5, 20, offset=1)] = 1
 
         obs_n = self.state_n
         reward_n = [0 for _ in range(self.n_agents)]
@@ -72,36 +79,42 @@ class GatheringEnv(gym.Env):
         info_n = [{}] * self.n_agents
 
         for i, a in enumerate(self.agents):
+            if self.tagged[i]:
+                continue
             if self.food[a]:
                 self.food[a] = -15
                 reward_n[i] = 1
+            if self.beams[a]:
+                self.tagged[i] = True
 
         self.food = (self.food + self.initial_food).clip(max=1)
 
         return obs_n, reward_n, done_n, info_n
 
-    def _viewbox_slice(self, agent_index, width, depth):
+    def _viewbox_slice(self, agent_index, width, depth, offset=0):
         left = width // 2
         right = left if width % 2 == 0 else left + 1
         x, y = self.agents[agent_index]
         return tuple(itertools.starmap(slice, (
-            ((x - left, x + right), (y, y - depth, -1)),      # up
-            ((x, x + depth), (y - left, y + right)),          # right
-            ((x + left, x - right, -1), (y, y + depth)),      # down
-            ((x, x - depth, -1), (y + left, y - right, -1)),  # left
+            ((x - left, x + right), (y - offset, y - offset - depth, -1)),      # up
+            ((x + offset, x + offset + depth), (y - left, y + right)),          # right
+            ((x + left, x - right, -1), (y + offset, y + offset + depth)),      # down
+            ((x - offset, x - offset - depth, -1), (y + left, y - right, -1)),  # left
         )[self.orientations[agent_index]]))
 
     @property
     def state_n(self):
         agents = np.zeros_like(self.food)
-        for a in self.agents:
-            agents[a] = 1
+        for i, a in enumerate(self.agents):
+            if not self.tagged[i]:
+                agents[a] = 1
 
         food = self.food.clip(min=0)
         s = np.zeros((self.n_agents, self.viewbox_width, self.viewbox_depth, 4))
         for i, (orientation, (x, y)) in enumerate(zip(self.orientations, self.agents)):
+            if self.tagged[i]:
+                continue
             full_state = np.stack([food, np.zeros_like(food), agents, self.walls], axis=-1)
-            full_state[x, y, 1] = 1
             full_state[x, y, 2] = 0
 
             xs, ys = self._viewbox_slice(i, self.viewbox_width, self.viewbox_depth)
@@ -134,7 +147,8 @@ class GatheringEnv(gym.Env):
         self.beams = np.zeros_like(self.food)
 
         self.agents = [(i + self.padding + 1, self.padding + 1) for i in range(self.n_agents)]
-        self.orientations = [UP for _ in range(self.n_agents)]
+        self.orientations = [UP for _ in self.agents]
+        self.tagged = [False for _ in self.agents]
 
         return self.state_n
 
@@ -182,7 +196,8 @@ class GatheringEnv(gym.Env):
                     fill_cell(x, y, 'grey')
 
         for i, (x, y) in enumerate(self.agents):
-            fill_cell(x, y, self.agent_colors[i])
+            if not self.tagged[i]:
+                fill_cell(x, y, self.agent_colors[i])
 
         if False:
             # Debug view: see the first player's viewbox perspective.
