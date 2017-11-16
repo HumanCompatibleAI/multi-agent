@@ -5,7 +5,7 @@ from env import GatheringEnv
 
 from model import Policy
 
-env = GatheringEnv(n_agents=2)
+env = GatheringEnv(n_agents=2, map_name='default')
 state_n = env.reset()
 env.render()
 
