@@ -7,18 +7,26 @@ import gym.spaces
 
 import numpy as np
 
+UP = 0
+RIGHT = 1
+DOWN = 2
+LEFT = 3
+
 
 class GatheringEnv(gym.Env):
     metadata = {'render.modes': ['human']}
     scale = 20
-    width = 31
-    height = 11
+    viewbox_width = 10
+    viewbox_depth = 20
+    padding = max(viewbox_width // 2, viewbox_depth - 1)
+    width = 31 + (padding + 1) * 2
+    height = 11 + (padding + 1) * 2
     agent_colors = ['red', 'yellow']
 
     def __init__(self, n_agents=1):
         self.n_agents = n_agents
         self.root = None
-        self.state_size = self.width * self.height * 3
+        self.state_size = self.viewbox_width * self.viewbox_depth * 4
         self.action_space = gym.spaces.MultiDiscrete([[0, 3]] * n_agents)
         self.observation_space = gym.spaces.MultiDiscrete([[[0, 1]] * self.state_size] * n_agents)
         self._spec = gym.envs.registration.EnvSpec(**_spec)
@@ -37,7 +45,9 @@ class GatheringEnv(gym.Env):
         next_locations = [a for a in self.agents]
         next_locations_map = collections.defaultdict(list)
         for i, ((dx, dy), (x, y)) in enumerate(zip(action_n, self.agents)):
-            next_ = ((x + dx) % self.width, (y + dy) % self.height)
+            next_ = ((x + dx), (y + dy))
+            if self.walls[next_]:
+                next_ = (x, y)
             next_locations[i] = next_
             next_locations_map[next_].append(i)
         for overlappers in next_locations_map.values():
@@ -65,14 +75,30 @@ class GatheringEnv(gym.Env):
         agents = np.zeros_like(self.food)
         for a in self.agents:
             agents[a] = 1
-        s = np.array([[
-            self.food.clip(min=0),
-            np.zeros_like(self.food),
-            agents,
-        ]]).repeat(self.n_agents, axis=0)
-        for i, (x, y) in enumerate(self.agents):
-            s[i, 1, x, y] = 1
-            s[i, 2, x, y] = 0
+
+        food = self.food.clip(min=0)
+        s = np.zeros((self.n_agents, self.viewbox_width, self.viewbox_depth, 4))
+        for i, (orientation, (x, y)) in enumerate(zip(self.orientations, self.agents)):
+            full_state = np.stack([food, np.zeros_like(food), agents, self.walls], axis=-1)
+            full_state[x, y, 1] = 1
+            full_state[x, y, 2] = 0
+
+            # Slice out the agent's view of the whole state, which is a box
+            # fixed to their position and orientation.
+            left = self.viewbox_width // 2
+            right = left if self.viewbox_width % 2 == 0 else left + 1
+            depth = self.viewbox_depth
+            if orientation == UP:
+                s[i] = full_state[x - left:x + right, y:y - depth:-1, :]
+            elif orientation == DOWN:
+                s[i] = full_state[x + left:x - right:-1, y:y + depth, :]
+            elif orientation == RIGHT:
+                full_state = full_state.transpose(1, 0, 2)
+                s[i] = full_state[y - left:y + right, x:x + depth, :]
+            elif orientation == LEFT:
+                full_state = full_state.transpose(1, 0, 2)
+                s[i] = full_state[y + left:y - right:-1, x:x - depth:-1, :]
+
         return s.reshape((self.n_agents, self.state_size))
 
     def _reset(self):
@@ -88,7 +114,15 @@ class GatheringEnv(gym.Env):
         ]).T
         self.initial_food = self.food.copy()
 
-        self.agents = [(i, 0) for i in range(self.n_agents)]
+        self.walls = np.zeros_like(self.food)
+        p = self.padding
+        self.walls[p:-p, p] = 1
+        self.walls[p:-p, -p - 1] = 1
+        self.walls[p, p:-p] = 1
+        self.walls[-p - 1, p:-p] = 1
+
+        self.agents = [(i + self.padding + 1, self.padding + 1) for i in range(self.n_agents)]
+        self.orientations = [UP for _ in range(self.n_agents)]
 
         return self.state_n
 
@@ -130,9 +164,35 @@ class GatheringEnv(gym.Env):
             for y in range(self.height):
                 if self.food[x, y] == 1:
                     fill_cell(x, y, 'green')
+                if self.walls[x, y] == 1:
+                    fill_cell(x, y, 'grey')
 
         for i, (x, y) in enumerate(self.agents):
             fill_cell(x, y, self.agent_colors[i])
+
+        if False:
+            # Debug view: see the first player's viewbox perspective.
+            p1_state = self.state_n[0].reshape(self.viewbox_width, self.viewbox_depth, 4)
+            for x in range(self.viewbox_width):
+                for y in range(self.viewbox_depth):
+                    food, me, other, wall = p1_state[x, y]
+                    assert sum((food, me, other, wall)) <= 1
+                    y_ = self.viewbox_depth - y - 1
+                    if food:
+                        fill_cell(x, y_, 'green')
+                    elif me:
+                        fill_cell(x, y_, 'cyan')
+                    elif other:
+                        fill_cell(x, y_, 'red')
+                    elif wall:
+                        fill_cell(x, y_, 'gray')
+            self.canvas.create_rectangle(
+                0,
+                0,
+                self.viewbox_width * self.scale,
+                self.viewbox_depth * self.scale,
+                outline='blue',
+            )
 
         self.root.update()
 
