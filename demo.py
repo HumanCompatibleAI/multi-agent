@@ -15,7 +15,7 @@ policy.load_weights()
 for _ in range(10000):
     state_n, reward_n, done_n, info_n = env.step([
         policy.select_action(state_n[0]),
-        random.randrange(0, 4),
+        random.randrange(0, 7),
     ])
     if any(done_n):
         break

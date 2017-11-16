@@ -27,7 +27,7 @@ class GatheringEnv(gym.Env):
         self.n_agents = n_agents
         self.root = None
         self.state_size = self.viewbox_width * self.viewbox_depth * 4
-        self.action_space = gym.spaces.MultiDiscrete([[0, 3]] * n_agents)
+        self.action_space = gym.spaces.MultiDiscrete([[0, 6]] * n_agents)
         self.observation_space = gym.spaces.MultiDiscrete([[[0, 1]] * self.state_size] * n_agents)
         self._spec = gym.envs.registration.EnvSpec(**_spec)
         self.reset()
@@ -40,11 +40,11 @@ class GatheringEnv(gym.Env):
             (1, 0),   # right
             (0, 1),   # down
             (-1, 0),  # left
-        ]
-        action_n = [directions[a] for a in action_n]
+        ] + [(0, 0)] * 3  # other, non-movement actions
+        movement_n = [directions[a] for a in action_n]
         next_locations = [a for a in self.agents]
         next_locations_map = collections.defaultdict(list)
-        for i, ((dx, dy), (x, y)) in enumerate(zip(action_n, self.agents)):
+        for i, ((dx, dy), (x, y)) in enumerate(zip(movement_n, self.agents)):
             next_ = ((x + dx), (y + dy))
             if self.walls[next_]:
                 next_ = (x, y)
@@ -55,6 +55,12 @@ class GatheringEnv(gym.Env):
                 for i in overlappers:
                     next_locations[i] = self.agents[i]
         self.agents = next_locations
+
+        for i, act in enumerate(action_n):
+            if act == 4:  # right
+                self.orientations[i] = (self.orientations[i] + 1) % 4
+            elif act == 5:  # left
+                self.orientations[i] = (self.orientations[i] - 1) % 4
 
         obs_n = self.state_n
         reward_n = [0 for _ in range(self.n_agents)]
