@@ -1,5 +1,6 @@
 import collections
 import itertools
+import os.path
 import tkinter as tk
 
 import gym
@@ -24,13 +25,29 @@ class GatheringEnv(gym.Env):
     viewbox_width = 10
     viewbox_depth = 20
     padding = max(viewbox_width // 2, viewbox_depth - 1)
-    width = 31 + (padding + 1) * 2
-    height = 11 + (padding + 1) * 2
     agent_colors = ['red', 'yellow']
 
-    def __init__(self, n_agents=1):
+    def _text_to_map(self, text):
+        m = [list(row) for row in text.splitlines()]
+        l = len(m[0])
+        for row in m:
+            if len(row) != l:
+                raise ValueError('the rows in the map are not all the same length')
+        return np.pad(np.array(m) == 'O', self.padding + 1, 'constant').T
+
+    def __init__(self, n_agents=1, map_name='default'):
         self.n_agents = n_agents
         self.root = None
+        if not os.path.exists(map_name):
+            expanded = os.path.join('maps', map_name + '.txt')
+            if not os.path.exists(expanded):
+                raise ValueError('map not found: ' + map_name)
+            map_name = expanded
+        with open(map_name) as f:
+            s = f.read().strip()
+        self.map = self._text_to_map(s)
+        self.width = self.map.shape[0]
+        self.height = self.map.shape[1]
         self.state_size = self.viewbox_width * self.viewbox_depth * 4
         self.action_space = gym.spaces.MultiDiscrete([[0, 7]] * n_agents)
         self.observation_space = gym.spaces.MultiDiscrete([[[0, 1]] * self.state_size] * n_agents)
@@ -144,16 +161,7 @@ class GatheringEnv(gym.Env):
         return s.reshape((self.n_agents, self.state_size))
 
     def _reset(self):
-        self.food = np.zeros((self.width, self.height), dtype=np.int)
-        mid_x = self.width // 2
-        mid_y = self.height // 2
-        self.food[mid_x - 2:mid_x + 3, mid_y - 2: mid_y + 3] = np.array([
-            [0, 0, 1, 0, 0],
-            [0, 1, 1, 1, 0],
-            [1, 1, 1, 1, 1],
-            [0, 1, 1, 1, 0],
-            [0, 0, 1, 0, 0],
-        ]).T
+        self.food = self.map.astype(np.int)
         self.initial_food = self.food.copy()
 
         self.walls = np.zeros_like(self.food)
