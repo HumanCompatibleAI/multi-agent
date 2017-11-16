@@ -42,13 +42,22 @@ class GatheringEnv(gym.Env):
         assert len(action_n) == self.n_agents
         action_n = [NOOP if self.tagged[i] else a for i, a in enumerate(action_n)]
         self.beams[:] = 0
-        directions = [
-            (0, -1),  # up
-            (1, 0),   # right
-            (0, 1),   # down
-            (-1, 0),  # left
-        ] + [(0, 0)] * 4  # other, non-movement actions
-        movement_n = [directions[a] for a in action_n]
+        movement_n = [(0, 0) for a in action_n]
+        for i, (a, orientation) in enumerate(zip(action_n, self.orientations)):
+            if a not in [UP, DOWN, LEFT, RIGHT]:
+                continue
+            # a is relative to the agent's orientation, so add the orientation
+            # before interpreting in the global coordinate system.
+            #
+            # This line is really not obvious to read. Replace it with something
+            # clearer if you have a better idea.
+            a = (a + orientation) % 4
+            movement_n[i] = [
+                (0, -1),  # up/forward
+                (1, 0),   # right
+                (0, 1),   # down/backward
+                (-1, 0),  # left
+            ][a]
         next_locations = [a for a in self.agents]
         next_locations_map = collections.defaultdict(list)
         for i, ((dx, dy), (x, y)) in enumerate(zip(movement_n, self.agents)):
