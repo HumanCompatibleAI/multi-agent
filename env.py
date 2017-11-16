@@ -1,4 +1,5 @@
 import collections
+import itertools
 import tkinter as tk
 
 import gym
@@ -76,6 +77,17 @@ class GatheringEnv(gym.Env):
 
         return obs_n, reward_n, done_n, info_n
 
+    def _viewbox_slice(self, agent_index, width, depth):
+        left = width // 2
+        right = left if width % 2 == 0 else left + 1
+        x, y = self.agents[agent_index]
+        return itertools.starmap(slice, (
+            ((x - left, x + right), (y, y - depth, -1)),      # up
+            ((x, x + depth), (y - left, y + right)),          # right
+            ((x + left, x - right, -1), (y, y + depth)),      # down
+            ((x, x - depth, -1), (y + left, y - right, -1)),  # left
+        )[self.orientations[agent_index]])
+
     @property
     def state_n(self):
         agents = np.zeros_like(self.food)
@@ -89,21 +101,10 @@ class GatheringEnv(gym.Env):
             full_state[x, y, 1] = 1
             full_state[x, y, 2] = 0
 
-            # Slice out the agent's view of the whole state, which is a box
-            # fixed to their position and orientation.
-            left = self.viewbox_width // 2
-            right = left if self.viewbox_width % 2 == 0 else left + 1
-            depth = self.viewbox_depth
-            if orientation == UP:
-                s[i] = full_state[x - left:x + right, y:y - depth:-1, :]
-            elif orientation == DOWN:
-                s[i] = full_state[x + left:x - right:-1, y:y + depth, :]
-            elif orientation == RIGHT:
-                full_state = full_state.transpose(1, 0, 2)
-                s[i] = full_state[y - left:y + right, x:x + depth, :]
-            elif orientation == LEFT:
-                full_state = full_state.transpose(1, 0, 2)
-                s[i] = full_state[y + left:y - right:-1, x:x - depth:-1, :]
+            xs, ys = self._viewbox_slice(i, self.viewbox_width, self.viewbox_depth)
+            observation = full_state[xs, ys, :]
+
+            s[i] = observation if orientation in [UP, DOWN] else observation.transpose(1, 0, 2)
 
         return s.reshape((self.n_agents, self.state_size))
 
