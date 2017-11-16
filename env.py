@@ -87,16 +87,16 @@ class GatheringEnv(gym.Env):
         done_n = [self.done] * self.n_agents
         info_n = [{}] * self.n_agents
 
+        self.food = (self.food + self.initial_food).clip(max=1)
+
         for i, a in enumerate(self.agents):
             if self.tagged[i]:
                 continue
-            if self.food[a]:
+            if self.food[a] == 1:
                 self.food[a] = -15
                 reward_n[i] = 1
             if self.beams[a]:
                 self.tagged[i] = 25
-
-        self.food = (self.food + self.initial_food).clip(max=1)
 
         for i, tag in enumerate(self.tagged):
             if tag == 1:
